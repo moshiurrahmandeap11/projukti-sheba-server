@@ -8,7 +8,7 @@ const fs = require("fs").promises;
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Ensure this folder exists
+    cb(null, "uploads/"); 
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, 
   fileFilter: (req, file, cb) => {
     const filetypes = /jpeg|jpg|png|gif/;
     const extname = filetypes.test(
@@ -147,7 +147,7 @@ router.get("/:uid/storage", async (req, res) => {
     const isPremium = user?.premium || false;
     const storageLimit = isPremium
       ? 50 * 1024 * 1024 * 1024
-      : 5 * 1024 * 1024 * 1024; // 50GB or 5GB
+      : 5 * 1024 * 1024 * 1024; 
     const storagePercentage = ((storageBytes / storageLimit) * 100).toFixed(1);
 
     res.json({
@@ -162,7 +162,6 @@ router.get("/:uid/storage", async (req, res) => {
   }
 });
 
-// PUT update user
 // PUT update user
 router.put("/:id", upload.single("profileImage"), async (req, res) => {
   try {
@@ -228,7 +227,7 @@ router.put("/:id", upload.single("profileImage"), async (req, res) => {
       message: "User profile updated successfully",
       modifiedCount: result.modifiedCount,
       result,
-      photoURL: updateData.photoURL // শুধু নতুন photoURL পাঠানো
+      photoURL: updateData.photoURL 
     });
 
   } catch (err) {
