@@ -103,12 +103,12 @@ app.get('/', (req, res) => {
 });
 
 
-// Start server only if not in a serverless environment
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
-}
+// Start the server
+// This is required for platforms like Render (Web Services) and for local development.
+// Serverless platforms like Vercel will ignore this and use the exported app.
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
 
-// Export the app for Vercel
+// Export the app for serverless platforms
 module.exports = app;
