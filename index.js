@@ -1,26 +1,34 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize Firebase Admin
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// Initialize Firebase Admin (যদি প্রয়োজন হয়)
+// নিশ্চিত হয়ে নাও যে তোমার .env ফাইলে FIREBASE_SERVICE_ACCOUNT_JSON সঠিকভাবে সেট করা আছে
+try {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+} catch (error) {
+  console.warn("Firebase Admin SDK শুরু করা যায়নি। FIREBASE_SERVICE_ACCOUNT_JSON চেক করুন।");
+}
+
 
 // Middleware
-app.use('/uploads', express.static('uploads')); // Note: This won't work on Vercel; consider removing or handling differently
+// Vercel-এর জন্য '/uploads' স্ট্যাটিক্যালি সার্ভ করা কাজ করবে না। 
+// ফাইল আপলোডের জন্য ক্লাউড স্টোরেজ (যেমন Cloudinary, AWS S3) ব্যবহার করা ভালো।
+// app.use('/uploads', express.static('uploads')); 
 app.use(cors());
 app.use(express.json());
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit to 100 requests per window
+  max: 100,
 }));
 
 // MongoDB URI
@@ -34,45 +42,42 @@ const client = new MongoClient(uri, {
   },
 });
 
-// Import routes
-const userRoute = require('./api/users');
-const totalProjectsRoute = require('./api/totalProjects');
-
 async function run() {
   try {
     await client.connect();
-    await client.db('admin').command({ ping: 1 });
-    console.log('Connected to MongoDB successfully! DB:', process.env.DB_NAME);
+    console.log('✅ Connected to MongoDB successfully!');
     const db = client.db(process.env.DB_NAME);
 
-    // Set collection for routes
-    userRoute.setCollection(db, admin);
-    totalProjectsRoute.setCollection(db);
+    // কালেকশনগুলো এখানে 정의 করা যেতে পারে যদি প্রয়োজন হয়
+    const usersCollection = db.collection('users');
+    const projectsCollection = db.collection('projects'); // অনুমান করছি তোমার একটি 'projects' কালেকশন আছে
 
-    // Use routes
-    app.use('/api/users', userRoute.router);
-    app.use('/api/total-projects', totalProjectsRoute.router);
+    // Use routes (নতুন পদ্ধতিতে)
+    // সরাসরি রাউট ফাইল require করে তার মধ্যে db বা কালেকশন পাস করে দেওয়া হচ্ছে
+    app.use('/api/users', require('./api/users')(usersCollection, admin));
+    // app.use('/api/total-projects', require('./api/totalProjects')(projectsCollection)); // totalProjects রাউটের জন্য একই প্যাটার্ন
+
   } catch (err) {
-    console.error('MongoDB connection error:', err.message);
-    // Do not exit; log error and continue with unmounted routes if needed
+    console.error('❌ MongoDB connection error:', err.message);
   }
 }
 
 run().catch(console.dir);
 
-// Root route (works without DB)
+// Root route
 app.get('/', (req, res) => {
   res.send('Projukti Sheba Backend is running 🚀');
 });
 
-// Handle server shutdown gracefully
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
+
+// SIGTERM হ্যান্ডলিং লোকাল ডেভেলপমেন্টের জন্য ঠিক আছে, কিন্তু সার্ভারলেস পরিবেশে এর প্রয়োজন নেই
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Closing MongoDB connection...');
   await client.close();
   process.exit(0);
 });
 
-// Start server without waiting for DB (Vercel will handle retries)
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+module.exports = app; // Vercel-এর জন্য app এক্সপোর্ট করা ভালো অভ্যাস
