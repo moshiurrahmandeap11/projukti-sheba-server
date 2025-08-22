@@ -54,8 +54,8 @@ async function run() {
     totalProjectsRoute.setCollection(db);
 
     // Use routes
-    app.use('/users', userRoute.router);
-    app.use('/total-projects', totalProjectsRoute.router);
+    app.use('/api/users', userRoute.router);
+    app.use('/api/total-projects', totalProjectsRoute.router);
   } catch (err) {
     console.error('MongoDB connection error:', err);
     process.exit(1); // Exit process on connection failure
