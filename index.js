@@ -14,10 +14,9 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-
 // Middleware
-app.use('/uploads', express.static('uploads'));
-app.use(cors()); // Restrict CORS in production
+app.use('/uploads', express.static('uploads')); // Note: This won't work on Vercel; consider removing or handling differently
+app.use(cors());
 app.use(express.json());
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -43,8 +42,7 @@ async function run() {
   try {
     await client.connect();
     await client.db('admin').command({ ping: 1 });
-    console.log('Connected to MongoDB successfully!');
-
+    console.log('Connected to MongoDB successfully! DB:', process.env.DB_NAME);
     const db = client.db(process.env.DB_NAME);
 
     // Set collection for routes
@@ -55,14 +53,14 @@ async function run() {
     app.use('/api/users', userRoute.router);
     app.use('/api/total-projects', totalProjectsRoute.router);
   } catch (err) {
-    console.error('MongoDB connection error:', err);
-    process.exit(1); // Exit process on connection failure
+    console.error('MongoDB connection error:', err.message);
+    // Do not exit; log error and continue with unmounted routes if needed
   }
 }
 
 run().catch(console.dir);
 
-// Root route
+// Root route (works without DB)
 app.get('/', (req, res) => {
   res.send('Projukti Sheba Backend is running 🚀');
 });
@@ -74,6 +72,7 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
+// Start server without waiting for DB (Vercel will handle retries)
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
