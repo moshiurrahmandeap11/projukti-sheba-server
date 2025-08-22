@@ -8,7 +8,6 @@ const { body, param, validationResult } = require('express-validator');
 const router = express.Router();
 
 let usersCollection;
-let admin;
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -36,27 +35,9 @@ const upload = multer({
   },
 });
 
-// Set collection and Firebase Admin from index.js
-const setCollection = (database, firebaseAdmin) => {
+// Set collection from index.js
+const setCollection = (database) => {
   usersCollection = database.collection('users');
-  admin = firebaseAdmin;
-};
-
-// Middleware to verify Firebase ID token
-const verifyToken = async (req, res, next) => {
-  const token = req.headers.authorization?.split('Bearer ')[1];
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'No token provided' });
-  }
-
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken;
-    next();
-  } catch (error) {
-    console.error('Error verifying token:', error);
-    res.status(401).json({ success: false, error: 'Invalid token' });
-  }
 };
 
 // Validation middleware
@@ -134,15 +115,9 @@ const formatBytes = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// GET all users (admin-only, requires token)
-router.get('/', verifyToken, async (req, res) => {
+// GET all users
+router.get('/', async (req, res) => {
   try {
-    // Optional: Restrict to admins only
-    const user = await usersCollection.findOne({ firebaseUID: req.user.uid });
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Admin access required' });
-    }
-
     const users = await usersCollection.find().toArray();
     res.status(200).json({ success: true, data: users, count: users.length });
   } catch (err) {
@@ -152,19 +127,10 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // GET single user by Firebase UID or MongoDB _id
-router.get('/:id', verifyToken, validateId, handleValidationErrors, async (req, res) => {
+router.get('/:id', validateId, handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
     let user;
-
-    // Restrict access: Users can only fetch their own data, admins can fetch any
-    const requestingUser = await usersCollection.findOne({ firebaseUID: req.user.uid });
-    if (!requestingUser) {
-      return res.status(404).json({ success: false, error: 'Requesting user not found' });
-    }
-    if (requestingUser.role !== 'admin' && id !== req.user.uid) {
-      return res.status(403).json({ success: false, error: 'Unauthorized: Can only access own data' });
-    }
 
     if (ObjectId.isValid(id) && id.length === 24) {
       user = await usersCollection.findOne({ _id: new ObjectId(id) });
@@ -202,14 +168,9 @@ router.get('/:id', verifyToken, validateId, handleValidationErrors, async (req, 
 });
 
 // GET user storage info separately
-router.get('/:uid/storage', verifyToken, async (req, res) => {
+router.get('/:uid/storage', async (req, res) => {
   try {
     const { uid } = req.params;
-
-    // Restrict access
-    if (req.user.uid !== uid) {
-      return res.status(403).json({ success: false, error: 'Unauthorized: Can only access own storage' });
-    }
 
     const storageBytes = await calculateUserStorage(uid);
 
@@ -285,30 +246,16 @@ router.post('/', userValidationRules, handleValidationErrors, async (req, res) =
 });
 
 // PUT update user
-router.put('/:id', verifyToken, validateId, userValidationRules, handleValidationErrors, upload.single('profileImage'), async (req, res) => {
+router.put('/:id', validateId, userValidationRules, handleValidationErrors, upload.single('profileImage'), async (req, res) => {
   try {
     const { id } = req.params;
     const { fullName, email, premium, privacy, role } = req.body;
-
-    // Restrict role updates to admins
-    const requestingUser = await usersCollection.findOne({ firebaseUID: req.user.uid });
-    if (!requestingUser) {
-      return res.status(404).json({ success: false, error: 'Requesting user not found' });
-    }
-    if (role && requestingUser.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Only admins can update roles' });
-    }
-
-    // Restrict access: Users can only update their own data, admins can update any
-    if (requestingUser.role !== 'admin' && id !== req.user.uid) {
-      return res.status(403).json({ success: false, error: 'Unauthorized: Can only update own data' });
-    }
 
     const updateData = {
       fullName: fullName || undefined,
       email: email || undefined,
       premium: premium !== undefined ? premium : undefined,
-      role: role || undefined, // Only include if provided and user is admin
+      role: role || undefined,
       privacy: privacy ? JSON.parse(privacy) : undefined,
       updatedAt: new Date(),
     };
@@ -364,18 +311,9 @@ router.put('/:id', verifyToken, validateId, userValidationRules, handleValidatio
 });
 
 // DELETE user
-router.delete('/:id', verifyToken, validateId, handleValidationErrors, async (req, res) => {
+router.delete('/:id', validateId, handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Restrict access: Users can only delete their own data, admins can delete any
-    const requestingUser = await usersCollection.findOne({ firebaseUID: req.user.uid });
-    if (!requestingUser) {
-      return res.status(404).json({ success: false, error: 'Requesting user not found' });
-    }
-    if (requestingUser.role !== 'admin' && id !== req.user.uid) {
-      return res.status(403).json({ success: false, error: 'Unauthorized: Can only delete own data' });
-    }
 
     let result;
     if (ObjectId.isValid(id) && id.length === 24) {
