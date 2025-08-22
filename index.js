@@ -9,10 +9,13 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Initialize Firebase Admin
-const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
+
+console.log('DEBUG:', process.env.FIREBASE_SERVICE_ACCOUNT_JSON); 
+
 
 // Middleware
 app.use('/uploads', express.static('uploads'));
