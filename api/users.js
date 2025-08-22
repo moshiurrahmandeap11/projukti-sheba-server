@@ -40,8 +40,8 @@ const setCollection = (database) => {
   usersCollection = database.collection('users');
 };
 
-// Validation middleware
-const userValidationRules = [
+// Validation middleware for POST
+const userValidationRulesPost = [
   body('firebaseUID')
     .trim()
     .notEmpty()
@@ -74,10 +74,7 @@ const validateId = [
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      errors: errors.array().map(err => ({ field: err.param, message: err.msg })),
-    });
+    return res.status(400).json({ errors: errors.array().map(err => ({ field: err.param, message: err.msg })) });
   }
   next();
 };
@@ -119,10 +116,10 @@ const formatBytes = (bytes) => {
 router.get('/', async (req, res) => {
   try {
     const users = await usersCollection.find().toArray();
-    res.status(200).json({ success: true, data: users, count: users.length });
+    res.status(200).json(users);
   } catch (err) {
     console.error('Error fetching users:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -139,7 +136,7 @@ router.get('/:id', validateId, handleValidationErrors, async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     // Calculate current storage
@@ -152,7 +149,7 @@ router.get('/:id', validateId, handleValidationErrors, async (req, res) => {
       { $set: { storageUsed: storageBytes, lastStorageUpdate: new Date() } }
     );
 
-    // Include role in response, default to "user"
+    // Include role and storage in response
     const userWithStorage = {
       ...user,
       role: user.role || 'user',
@@ -160,10 +157,10 @@ router.get('/:id', validateId, handleValidationErrors, async (req, res) => {
       storageBytes,
     };
 
-    res.status(200).json({ success: true, data: userWithStorage });
+    res.status(200).json(userWithStorage);
   } catch (err) {
     console.error('Error fetching user:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -183,37 +180,34 @@ router.get('/:uid/storage', async (req, res) => {
     // Storage limit check
     const user = await usersCollection.findOne({ firebaseUID: uid });
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
     const isPremium = user.premium || false;
     const storageLimit = isPremium ? 50 * 1024 * 1024 * 1024 : 5 * 1024 * 1024 * 1024;
     const storagePercentage = ((storageBytes / storageLimit) * 100).toFixed(1);
 
     res.status(200).json({
-      success: true,
-      data: {
-        storageUsed: formatBytes(storageBytes),
-        storageBytes,
-        storageLimit: formatBytes(storageLimit),
-        storagePercentage,
-        isPremium,
-      },
+      storageUsed: formatBytes(storageBytes),
+      storageBytes,
+      storageLimit: formatBytes(storageLimit),
+      storagePercentage,
+      isPremium,
     });
   } catch (err) {
     console.error('Error fetching storage:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // POST create user
-router.post('/', userValidationRules, handleValidationErrors, async (req, res) => {
+router.post('/', userValidationRulesPost, handleValidationErrors, async (req, res) => {
   try {
     const { firebaseUID, fullName, email, premium } = req.body;
 
     // Check for existing user
     const existingUser = await usersCollection.findOne({ firebaseUID });
     if (existingUser) {
-      return res.status(400).json({ success: false, error: 'User with this Firebase UID already exists' });
+      return res.status(400).json({ error: 'User with this Firebase UID already exists' });
     }
 
     const newUser = {
@@ -221,7 +215,7 @@ router.post('/', userValidationRules, handleValidationErrors, async (req, res) =
       fullName: fullName || '',
       email: email || '',
       premium: premium || false,
-      role: 'user', // Default role
+      role: 'user',
       storageUsed: 0,
       projects: 0,
       createdAt: new Date(),
@@ -234,29 +228,53 @@ router.post('/', userValidationRules, handleValidationErrors, async (req, res) =
     };
 
     const result = await usersCollection.insertOne(newUser);
-    res.status(201).json({
-      success: true,
-      message: 'User created successfully',
-      data: { _id: result.insertedId, ...newUser },
-    });
+    res.status(201).json({ _id: result.insertedId, ...newUser });
   } catch (err) {
     console.error('Error creating user:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // PUT update user
-router.put('/:id', validateId, userValidationRules, handleValidationErrors, upload.single('profileImage'), async (req, res) => {
+router.put('/:id', validateId, handleValidationErrors, upload.single('profileImage'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, email, premium, privacy, role } = req.body;
+    const {
+      fullName,
+      email,
+      phone,
+      location,
+      company,
+      position,
+      bio,
+      website,
+      linkedIn,
+      github,
+      twitter,
+      dateOfBirth,
+      privacy,
+      premium,
+      role,
+    } = req.body;
+
+    console.log("Parsed privacy:", privacy ? JSON.parse(privacy) : null);
 
     const updateData = {
       fullName: fullName || undefined,
       email: email || undefined,
+      phone: phone || undefined,
+      location: location || undefined,
+      company: company || undefined,
+      position: position || undefined,
+      bio: bio || undefined,
+      website: website || undefined,
+      linkedIn: linkedIn || undefined,
+      github: github || undefined,
+      twitter: twitter || undefined,
+      dateOfBirth: dateOfBirth || undefined,
+      privacy: privacy ? JSON.parse(privacy) : undefined,
       premium: premium !== undefined ? premium : undefined,
       role: role || undefined,
-      privacy: privacy ? JSON.parse(privacy) : undefined,
       updatedAt: new Date(),
     };
 
@@ -281,15 +299,11 @@ router.put('/:id', validateId, userValidationRules, handleValidationErrors, uplo
     }
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     if (result.modifiedCount === 0) {
-      return res.status(200).json({
-        success: true,
-        message: 'No changes made to user profile',
-        data: updateData,
-      });
+      return res.status(200).json(updateData);
     }
 
     // Recalculate storage after update
@@ -299,14 +313,10 @@ router.put('/:id', validateId, userValidationRules, handleValidationErrors, uplo
       { $set: { storageUsed: storageBytes, lastStorageUpdate: new Date() } }
     );
 
-    res.status(200).json({
-      success: true,
-      message: 'User profile updated successfully',
-      data: { ...updateData, storageBytes },
-    });
+    res.status(200).json({ ...updateData, photoURL: updateData.photoURL, storageBytes });
   } catch (err) {
     console.error('Error updating user:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -323,16 +333,13 @@ router.delete('/:id', validateId, handleValidationErrors, async (req, res) => {
     }
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'User deleted successfully',
-    });
+    res.status(200).json({ message: 'User deleted successfully' });
   } catch (err) {
     console.error('Error deleting user:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
