@@ -14,12 +14,10 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-console.log('DEBUG:', process.env.FIREBASE_SERVICE_ACCOUNT_JSON); 
-
 
 // Middleware
 app.use('/uploads', express.static('uploads'));
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000' })); // Restrict CORS in production
+app.use(cors()); // Restrict CORS in production
 app.use(express.json());
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -48,14 +46,17 @@ async function run() {
     console.log('Connected to MongoDB successfully!');
 
     const db = client.db(process.env.DB_NAME);
+    const userCollection = db.collection('users');
+    const totalProjectsCollection = db.collection('totalProjects');
 
     // Set collection for routes
-    userRoute.setCollection(db, admin);
-    totalProjectsRoute.setCollection(db);
+    userRoute.setCollection(userCollection, admin);
+    totalProjectsRoute.setCollection(totalProjectsCollection);
 
     // Use routes
-    app.use('/api/users', userRoute.router);
+    app.use("/users", require("./api/users")(userCollection, admin));
     app.use('/api/total-projects', totalProjectsRoute.router);
+    app.use("/total-projects", require("./api/totalProjects")(totalProjectsCollection));
   } catch (err) {
     console.error('MongoDB connection error:', err);
     process.exit(1); // Exit process on connection failure
