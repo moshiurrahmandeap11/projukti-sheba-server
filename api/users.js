@@ -9,31 +9,31 @@ const router = express.Router();
 
 let usersCollection;
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
+// Configure multer for file uploads (commented out temporarily)
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, 'uploads/');
+//   },
+//   filename: (req, file, cb) => {
+//     cb(null, `${Date.now()}-${file.originalname}`);
+//   },
+// });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
+// const upload = multer({
+//   storage,
+//   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+//   fileFilter: (req, file, cb) => {
+//     const filetypes = /jpeg|jpg|png|gif/;
+//     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+//     const mimetype = filetypes.test(file.mimetype);
 
-    if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Images only (jpg, png, gif)'));
-    }
-  },
-});
+//     if (extname && mimetype) {
+//       return cb(null, true);
+//     } else {
+//       cb(new Error('Images only (jpg, png, gif)'));
+//     }
+//   },
+// });
 
 // Set collection from index.js
 const setCollection = (database) => {
@@ -246,7 +246,7 @@ router.post('/', userValidationRules, handleValidationErrors, async (req, res) =
 });
 
 // PUT update user
-router.put('/:id', validateId, userValidationRules, handleValidationErrors, upload.single('profileImage'), async (req, res) => {
+router.put('/:id', validateId, userValidationRules, handleValidationErrors, /* upload.single('profileImage'), */ async (req, res) => {
   try {
     const { id } = req.params;
     const { fullName, email, premium, privacy, role } = req.body;
@@ -260,9 +260,9 @@ router.put('/:id', validateId, userValidationRules, handleValidationErrors, uplo
       updatedAt: new Date(),
     };
 
-    if (req.file) {
-      updateData.photoURL = `/uploads/${req.file.filename}`;
-    }
+    // if (req.file) {
+    //   updateData.photoURL = `/uploads/${req.file.filename}`;
+    // }
 
     // Remove undefined fields
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
