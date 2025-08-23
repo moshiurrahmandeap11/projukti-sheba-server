@@ -33,7 +33,7 @@ const totalProjectsRoute = require('./api/totalProjects');
 
 async function run() {
   try {
-    // await client.connect();
+    await client.connect();
     await client.db('admin').command({ ping: 1 });
     console.log('Connected to MongoDB successfully! DB:', process.env.DB_NAME);
     const db = client.db(process.env.DB_NAME);
@@ -61,7 +61,7 @@ app.get('/', (req, res) => {
 // Handle server shutdown gracefully
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Closing MongoDB connection...');
-  // await client.close();
+  await client.close();
   process.exit(0);
 });
 
