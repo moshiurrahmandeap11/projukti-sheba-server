@@ -202,7 +202,7 @@ router.get('/:uid/storage', async (req, res) => {
 // POST create user
 router.post('/', userValidationRulesPost, handleValidationErrors, async (req, res) => {
   try {
-    const { firebaseUID, fullName, email, premium } = req.body;
+    const { firebaseUID, fullName, email, premium, role } = req.body;
 
     // Check for existing user
     const existingUser = await usersCollection.findOne({ firebaseUID });
@@ -215,7 +215,7 @@ router.post('/', userValidationRulesPost, handleValidationErrors, async (req, re
       fullName: fullName || '',
       email: email || '',
       premium: premium || false,
-      role: 'user',
+      role: role || 'user',
       storageUsed: 0,
       projects: 0,
       createdAt: new Date(),

@@ -1,21 +1,11 @@
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
-const admin = require('firebase-admin');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-// Initialize Firebase Admin
-// instead of using env variable
-const serviceAccount = require('./serviceAccountKey.json');
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
 
 // Middleware
 app.use('/uploads', express.static('uploads')); // Note: This won't work on Vercel; consider removing or handling differently
@@ -49,7 +39,7 @@ async function run() {
     const db = client.db(process.env.DB_NAME);
 
     // Set collection for routes
-    userRoute.setCollection(db, admin);
+    userRoute.setCollection(db);
     totalProjectsRoute.setCollection(db);
 
     // Use routes
