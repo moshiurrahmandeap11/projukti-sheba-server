@@ -279,7 +279,7 @@ router.put('/:id', validateId, handleValidationErrors, upload.single('profileIma
     };
 
     if (req.file) {
-      updateData.photoURL = `/uploads/${req.file.filename}`;
+      updateData.photoURL = `/uploads/${req.file.filename}`; 
     }
 
     // Remove undefined fields
