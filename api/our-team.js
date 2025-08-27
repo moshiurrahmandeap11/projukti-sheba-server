@@ -64,6 +64,32 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET a team member by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const memberId = req.params.id;
+    if (!ObjectId.isValid(memberId)) {
+      return res.status(400).json({ success: false, message: "Invalid team member ID" });
+    }
+
+    const member = await OurTeamCollection.findOne({ _id: new ObjectId(memberId) });
+    if (!member) {
+      return res.status(404).json({ success: false, message: "Team member not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: member,
+    });
+  } catch (error) {
+    console.error("Error fetching team member by ID:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch team member",
+    });
+  }
+});
+
 // POST a new team member
 router.post("/", validateTeamMember, async (req, res) => {
   try {
