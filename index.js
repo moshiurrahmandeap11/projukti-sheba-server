@@ -54,6 +54,7 @@ const servicesRoute = require("./api/services");
 const technogoliesRoute = require("./api/technologies");
 const categoriesRoute = require("./api/categories");
 const chatsRoute = require("./api/chat");
+const analyticsRoute = require("./api/analytics");
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -254,7 +255,8 @@ async function run() {
     app.use('/technologies', technogoliesRoute.router);
     app.use('/categories', categoriesRoute.router);
     app.use('/chats', chatsRoute.router);
-    
+    app.use('/analytics', analyticsRoute.router);
+
     console.log('All routes mounted successfully with Socket.IO support');
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
@@ -270,8 +272,7 @@ app.get('/', (req, res) => {
 
 // Handle server shutdown gracefully
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Closing MongoDB connection...');
-  await client.close();
+  console.log('SIGTERM received. Closing MongoDB connection...');  await client.close();
   process.exit(0);
 });
 
