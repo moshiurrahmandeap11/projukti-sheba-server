@@ -56,6 +56,7 @@ const categoriesRoute = require("./api/categories");
 const chatsRoute = require("./api/chat");
 const analyticsRoute = require("./api/analytics");
 const ourteamRoute = require("./api/our-team");
+const contactUsRoute = require("./api/contact-us");
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -249,6 +250,7 @@ async function run() {
     categoriesRoute.setCollection(database);
     chatsRoute.setCollection(database);
     ourteamRoute.setCollection(database);
+    contactUsRoute.setCollection(database);
 
     // Use routes
     app.use('/users', userRoute.router);
@@ -259,6 +261,7 @@ async function run() {
     app.use('/chats', chatsRoute.router);
     app.use('/analytics', analyticsRoute.router);
     app.use('/our-team', ourteamRoute.router);
+    app.use('/contact-us', contactUsRoute.router);
 
     console.log('All routes mounted successfully with Socket.IO support');
   } catch (err) {
