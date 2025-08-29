@@ -1,7 +1,12 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { setCollection } = require('./our-team');
 const router = express.Router();
+
+let ContactUsCollection;
+
+const setCollection = (db) => {
+    ContactUsCollection = db.collection("contactRequests");
+};
 
 // POST: Save unsubmitted form data
 router.post('/', async (req, res) => {
