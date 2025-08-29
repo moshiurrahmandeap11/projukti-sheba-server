@@ -4,7 +4,7 @@ const { setCollection } = require('./our-team');
 const router = express.Router();
 
 // POST: Save unsubmitted form data
-router.post('/contact-us', async (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const { name, email, phone, company, subject, message, service } = req.body;
 
@@ -61,7 +61,7 @@ router.get('/', async (req, res) => {
 });
 
 // DELETE: Delete a contact request by ID
-router.delete('/contact-us/:id', async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
