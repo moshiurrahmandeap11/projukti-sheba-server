@@ -1,39 +1,10 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
 const { body, param, validationResult } = require('express-validator');
 
 const router = express.Router();
 
 let usersCollection;
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Images only (jpg, png, gif)'));
-    }
-  },
-});
 
 // Set collection from index.js
 const setCollection = (database) => {
@@ -63,6 +34,84 @@ const userValidationRulesPost = [
     .withMessage('Role must be either "user" or "admin"'),
 ];
 
+// Validation middleware for PUT
+const userValidationRulesPut = [
+  body('firebaseUID')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Firebase UID is required')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Invalid Firebase UID format'),
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('Invalid email format'),
+  body('fullName')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Full name must not exceed 100 characters'),
+  body('photoURL')
+    .optional()
+    .isURL()
+    .withMessage('Invalid photo URL format'),
+  body('phone')
+    .optional()
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage('Phone number must not exceed 20 characters'),
+  body('location')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Location must not exceed 100 characters'),
+  body('company')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Company must not exceed 100 characters'),
+  body('position')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Position must not exceed 100 characters'),
+  body('bio')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Bio must not exceed 500 characters'),
+  body('website')
+    .optional()
+    .isURL()
+    .withMessage('Invalid website URL format'),
+  body('linkedIn')
+    .optional()
+    .isURL()
+    .withMessage('Invalid LinkedIn URL format'),
+  body('github')
+    .optional()
+    .isURL()
+    .withMessage('Invalid GitHub URL format'),
+  body('twitter')
+    .optional()
+    .isURL()
+    .withMessage('Invalid Twitter URL format'),
+  body('dateOfBirth')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid date format'),
+  body('privacy')
+    .optional()
+    .customSanitizer(value => (typeof value === 'string' ? JSON.parse(value) : value))
+    .isObject()
+    .withMessage('Privacy must be a valid JSON object'),
+  body('role')
+    .optional()
+    .isIn(['user', 'admin'])
+    .withMessage('Role must be either "user" or "admin"'),
+];
+
 // Validation middleware for ID (MongoDB _id or firebaseUID)
 const validateId = [
   param('id')
@@ -86,15 +135,6 @@ const calculateUserStorage = async (firebaseUID) => {
     const userProfile = await usersCollection.findOne({ firebaseUID });
     if (userProfile) {
       totalBytes += JSON.stringify(userProfile).length;
-      if (userProfile.photoURL) {
-        try {
-          const filePath = path.join(__dirname, '..', userProfile.photoURL);
-          const stats = await fs.stat(filePath);
-          totalBytes += stats.size;
-        } catch (fileError) {
-          console.error(`Error reading profile image size for ${firebaseUID}: ${fileError.message}`);
-        }
-      }
     }
     return totalBytes;
   } catch (error) {
@@ -202,7 +242,7 @@ router.get('/:uid/storage', async (req, res) => {
 // POST create user
 router.post('/', userValidationRulesPost, handleValidationErrors, async (req, res) => {
   try {
-    const { firebaseUID, fullName, email, premium, role } = req.body;
+    const { firebaseUID, fullName, email, premium, role, photoURL } = req.body;
 
     // Check for existing user
     const existingUser = await usersCollection.findOne({ firebaseUID });
@@ -220,6 +260,7 @@ router.post('/', userValidationRulesPost, handleValidationErrors, async (req, re
       projects: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
+      photoURL: photoURL || '',
       privacy: {
         showEmail: true,
         showPhone: false,
@@ -236,7 +277,7 @@ router.post('/', userValidationRulesPost, handleValidationErrors, async (req, re
 });
 
 // PUT update user
-router.put('/:id', validateId, handleValidationErrors, upload.single('profileImage'), async (req, res) => {
+router.put('/:id', validateId, userValidationRulesPut, handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -255,9 +296,10 @@ router.put('/:id', validateId, handleValidationErrors, upload.single('profileIma
       privacy,
       premium,
       role,
+      photoURL,
     } = req.body;
 
-    console.log("Parsed privacy:", privacy ? JSON.parse(privacy) : null);
+    console.log("Parsed privacy:", privacy ? (typeof privacy === 'string' ? JSON.parse(privacy) : privacy) : null);
 
     const updateData = {
       fullName: fullName || undefined,
@@ -272,15 +314,12 @@ router.put('/:id', validateId, handleValidationErrors, upload.single('profileIma
       github: github || undefined,
       twitter: twitter || undefined,
       dateOfBirth: dateOfBirth || undefined,
-      privacy: privacy ? JSON.parse(privacy) : undefined,
+      privacy: privacy ? (typeof privacy === 'string' ? JSON.parse(privacy) : privacy) : undefined,
       premium: premium !== undefined ? premium : undefined,
       role: role || undefined,
+      photoURL: photoURL || undefined,
       updatedAt: new Date(),
     };
-
-    if (req.file) {
-      updateData.photoURL = `/uploads/${req.file.filename}`; 
-    }
 
     // Remove undefined fields
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
@@ -313,7 +352,7 @@ router.put('/:id', validateId, handleValidationErrors, upload.single('profileIma
       { $set: { storageUsed: storageBytes, lastStorageUpdate: new Date() } }
     );
 
-    res.status(200).json({ ...updateData, photoURL: updateData.photoURL, storageBytes });
+    res.status(200).json({ ...updateData, storageBytes });
   } catch (err) {
     console.error('Error updating user:', err);
     res.status(500).json({ error: 'Internal server error' });
