@@ -10,14 +10,28 @@ const setCollection = (db) => {
 }
 
 // get all support tickets
-router.get("/", async(req, res) => {
+router.get("/", async (req, res) => {
     try {
-        const tickets = await supportTicketsCollection.find().toArray();
+        const { startDate, endDate } = req.query; // YYYY-MM-DD format expected
+        const query = {};
+
+        // Date filter
+        if (startDate || endDate) {
+            query.createdAt = {};
+            if (startDate) query.createdAt.$gte = new Date(startDate).toISOString();
+            if (endDate) query.createdAt.$lte = new Date(endDate).toISOString();
+        }
+
+        const tickets = await supportTicketsCollection
+            .find(query)
+            .sort({ createdAt: -1 }) // latest first
+            .toArray();
+
         res.status(200).json({
             success: true,
             count: tickets.length,
             data: tickets
-        })
+        });
     } catch (error) {
         console.error("Error fetching support tickets:", error);
         res.status(500).json({
@@ -25,7 +39,8 @@ router.get("/", async(req, res) => {
             message: "Internal server error"
         });
     }
-})
+});
+
 
 // post api
 router.post("/", async(req, res) => {
