@@ -27,4 +27,16 @@ router.get("/", async(req, res) => {
     }
 })
 
+
+// post api
+router.post("/", async(req, res) => {
+    try {
+        const newTicket = req.body;
+        const result = await supportTicketsCollection.insertOne(newTicket);
+        res.send(result);
+    } catch (error) {
+        console.error("error fetching support tickets:", error);
+    }
+})
+
 module.exports = {router, setCollection}
