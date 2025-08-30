@@ -1,39 +1,10 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
 const { body, param, validationResult } = require('express-validator');
 
 const router = express.Router();
 
 let usersCollection;
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Images only (jpg, png, gif)'));
-    }
-  },
-});
 
 // Set collection from index.js
 const setCollection = (database) => {
@@ -61,9 +32,102 @@ const userValidationRulesPost = [
     .optional()
     .isIn(['user', 'admin'])
     .withMessage('Role must be either "user" or "admin"'),
+  body('photoURL')
+    .optional()
+    .isURL()
+    .withMessage('Invalid photo URL format'),
 ];
 
-// Validation middleware for ID (MongoDB _id or firebaseUID)
+// Validation middleware for PUT
+const userValidationRulesPut = [
+  body('firebaseUID')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Firebase UID is required')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Invalid Firebase UID format'),
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('Invalid email format'),
+  body('fullName')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Full name must not exceed 100 characters'),
+  body('photoURL')
+    .optional()
+    .isURL()
+    .withMessage('Invalid photo URL format'),
+  body('phone')
+    .optional()
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage('Phone number must not exceed 20 characters'),
+  body('location')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Location must not exceed 100 characters'),
+  body('company')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Company must not exceed 100 characters'),
+  body('position')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Position must not exceed 100 characters'),
+  body('bio')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Bio must not exceed 500 characters'),
+  body('website')
+    .optional()
+    .isURL()
+    .withMessage('Invalid website URL format'),
+  body('linkedIn')
+    .optional()
+    .isURL()
+    .withMessage('Invalid LinkedIn URL format'),
+  body('github')
+    .optional()
+    .isURL()
+    .withMessage('Invalid GitHub URL format'),
+  body('twitter')
+    .optional()
+    .isURL()
+    .withMessage('Invalid Twitter URL format'),
+  body('dateOfBirth')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid date format'),
+  body('privacy')
+    .optional()
+    .isObject()
+    .withMessage('Privacy must be a valid object'),
+  body('privacy.showEmail')
+    .optional()
+    .isBoolean()
+    .withMessage('showEmail must be a boolean'),
+  body('privacy.showPhone')
+    .optional()
+    .isBoolean()
+    .withMessage('showPhone must be a boolean'),
+  body('privacy.showLocation')
+    .optional()
+    .isBoolean()
+    .withMessage('showLocation must be a boolean'),
+  body('role')
+    .optional()
+    .isIn(['user', 'admin'])
+    .withMessage('Role must be either "user" or "admin"'),
+];
+
+// Validation middleware for ID
 const validateId = [
   param('id')
     .custom((value) => ObjectId.isValid(value) || /^[a-zA-Z0-9_-]+$/.test(value))
@@ -86,15 +150,6 @@ const calculateUserStorage = async (firebaseUID) => {
     const userProfile = await usersCollection.findOne({ firebaseUID });
     if (userProfile) {
       totalBytes += JSON.stringify(userProfile).length;
-      if (userProfile.photoURL) {
-        try {
-          const filePath = path.join(__dirname, '..', userProfile.photoURL);
-          const stats = await fs.stat(filePath);
-          totalBytes += stats.size;
-        } catch (fileError) {
-          console.error(`Error reading profile image size for ${firebaseUID}: ${fileError.message}`);
-        }
-      }
     }
     return totalBytes;
   } catch (error) {
@@ -103,7 +158,7 @@ const calculateUserStorage = async (firebaseUID) => {
   }
 };
 
-// Helper function to format bytes
+// Helper: format bytes
 const formatBytes = (bytes) => {
   if (bytes === 0) return '0 MB';
   const k = 1024;
@@ -123,7 +178,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET single user by Firebase UID or MongoDB _id
+// GET single user
 router.get('/:id', validateId, handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
@@ -139,32 +194,26 @@ router.get('/:id', validateId, handleValidationErrors, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Calculate current storage
-    let storageBytes = user.storageUsed || 0;
-    storageBytes = await calculateUserStorage(user.firebaseUID);
-
-    // Update storage in database
+    // Calculate storage
+    const storageBytes = await calculateUserStorage(user.firebaseUID);
     await usersCollection.updateOne(
       { firebaseUID: user.firebaseUID },
       { $set: { storageUsed: storageBytes, lastStorageUpdate: new Date() } }
     );
 
-    // Include role and storage in response
-    const userWithStorage = {
+    res.status(200).json({
       ...user,
       role: user.role || 'user',
       storageUsed: formatBytes(storageBytes),
       storageBytes,
-    };
-
-    res.status(200).json(userWithStorage);
+    });
   } catch (err) {
     console.error('Error fetching user:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// GET user storage info separately
+// GET user storage info
 router.get('/:uid/storage', async (req, res) => {
   try {
     const { uid } = req.params;
@@ -202,7 +251,7 @@ router.get('/:uid/storage', async (req, res) => {
 // POST create user
 router.post('/', userValidationRulesPost, handleValidationErrors, async (req, res) => {
   try {
-    const { firebaseUID, fullName, email, premium, role } = req.body;
+    const { firebaseUID, fullName, email, premium, role, photoURL } = req.body;
 
     // Check for existing user
     const existingUser = await usersCollection.findOne({ firebaseUID });
@@ -216,6 +265,7 @@ router.post('/', userValidationRulesPost, handleValidationErrors, async (req, re
       email: email || '',
       premium: premium || false,
       role: role || 'user',
+      photoURL: photoURL || '',
       storageUsed: 0,
       projects: 0,
       createdAt: new Date(),
@@ -236,51 +286,11 @@ router.post('/', userValidationRulesPost, handleValidationErrors, async (req, re
 });
 
 // PUT update user
-router.put('/:id', validateId, handleValidationErrors, upload.single('profileImage'), async (req, res) => {
+// PUT update user (no validation)
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      fullName,
-      email,
-      phone,
-      location,
-      company,
-      position,
-      bio,
-      website,
-      linkedIn,
-      github,
-      twitter,
-      dateOfBirth,
-      privacy,
-      premium,
-      role,
-    } = req.body;
-
-    console.log("Parsed privacy:", privacy ? JSON.parse(privacy) : null);
-
-    const updateData = {
-      fullName: fullName || undefined,
-      email: email || undefined,
-      phone: phone || undefined,
-      location: location || undefined,
-      company: company || undefined,
-      position: position || undefined,
-      bio: bio || undefined,
-      website: website || undefined,
-      linkedIn: linkedIn || undefined,
-      github: github || undefined,
-      twitter: twitter || undefined,
-      dateOfBirth: dateOfBirth || undefined,
-      privacy: privacy ? JSON.parse(privacy) : undefined,
-      premium: premium !== undefined ? premium : undefined,
-      role: role || undefined,
-      updatedAt: new Date(),
-    };
-
-    if (req.file) {
-      updateData.photoURL = `/uploads/${req.file.filename}`; 
-    }
+    const updateData = { ...req.body, updatedAt: new Date() };
 
     // Remove undefined fields
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
@@ -302,23 +312,20 @@ router.put('/:id', validateId, handleValidationErrors, upload.single('profileIma
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (result.modifiedCount === 0) {
-      return res.status(200).json(updateData);
-    }
-
-    // Recalculate storage after update
+    // Recalculate storage
     const storageBytes = await calculateUserStorage(id);
     await usersCollection.updateOne(
       { firebaseUID: id },
       { $set: { storageUsed: storageBytes, lastStorageUpdate: new Date() } }
     );
 
-    res.status(200).json({ ...updateData, photoURL: updateData.photoURL, storageBytes });
+    res.status(200).json({ ...updateData, storageBytes });
   } catch (err) {
     console.error('Error updating user:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 // DELETE user
 router.delete('/:id', validateId, handleValidationErrors, async (req, res) => {
