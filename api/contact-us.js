@@ -29,6 +29,7 @@ router.post('/', async (req, res) => {
             subject,
             message,
             service: service || '',
+            status: 'pending', // Add default status
             createdAt: new Date(),
             submitted: false
         };
@@ -42,7 +43,8 @@ router.post('/', async (req, res) => {
         console.error('Error creating unsubmitted contact request:', error);
         res.status(500).json({
             success: false,
-            message: 'Internal server error'
+            message: 'Internal server error',
+            error: error.message
         });
     }
 });
@@ -60,7 +62,57 @@ router.get('/', async (req, res) => {
         console.error('Error fetching contact requests:', error);
         res.status(500).json({
             success: false,
-            message: 'Internal server error'
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// PATCH: Update status of a draft contact request by ID
+router.patch('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        // Validate ObjectID
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid ID format'
+            });
+        }
+
+        // Validate status
+        const validStatuses = ['pending', 'engage', 'completed'];
+        if (!status || !validStatuses.includes(status.toLowerCase())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid status. Must be one of: pending, engage, completed'
+            });
+        }
+
+        const result = await ContactUsCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: { status: status.toLowerCase() } }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Contact request not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Status updated successfully'
+        });
+    } catch (error) {
+        console.error('Error updating contact request status:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
         });
     }
 });
@@ -95,7 +147,8 @@ router.delete('/:id', async (req, res) => {
         console.error('Error deleting contact request:', error);
         res.status(500).json({
             success: false,
-            message: 'Internal server error'
+            message: 'Internal server error',
+            error: error.message
         });
     }
 });
