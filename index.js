@@ -256,7 +256,7 @@ async function run() {
     contactUsRoute.setCollection(database);
     contactUsSubmittedRoute.setCollection(database);
     supportRoute.setCollection(database);
-    technogoliesRoute.setCollection(database)
+    testimonialsRoute.setCollection(database)
 
     // Use routes
     app.use('/users', userRoute.router);
