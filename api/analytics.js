@@ -19,71 +19,106 @@ const analyticsDataClient = new BetaAnalyticsDataClient({
 });
 
 // Function to fetch data
-async function getAnalyticsData() {
+async function getAnalyticsData(startDate, endDate) {
   try {
-    const [response] = await analyticsDataClient.runReport({
+    // Aggregate report for totals
+    const [aggregateResponse] = await analyticsDataClient.runReport({
       property: `properties/${process.env.GA4_PROPERTY_ID}`,
-      dateRanges: [{ startDate: "7daysAgo", endDate: "today" }],
-      dimensions: [
-        { name: "country" },
-        { name: "deviceCategory" },
-        { name: "city" },
-        { name: "pagePath" },
-      ],
+      dateRanges: [{ startDate, endDate }],
       metrics: [
-        { name: "activeUsers" },
+        { name: "totalUsers" },
         { name: "newUsers" },
         { name: "averageSessionDuration" },
-        { name: "totalUsers" },
       ],
     });
 
-    // Check if response has rows
-    if (!response.rows || response.rows.length === 0) {
-      console.log("No analytics data available");
-      return {
-        newUsers: 0,
-        returningUsers: 0,
-        geo: {},
-        devices: {},
-        cities: {},
-        exitPages: {},
-        avgSessionDuration: 0,
-      };
+    const processedData = {
+      newUsers: 0,
+      returningUsers: 0,
+      avgSessionDuration: 0,
+      geo: {},
+      devices: {},
+      exitPages: {},
+      funnel: { visitors: 0, leads: 0, clients: 0 },
+      sources: {},
+    };
+
+    if (aggregateResponse.rows && aggregateResponse.rows.length > 0) {
+      const row = aggregateResponse.rows[0];
+      processedData.totalUsers = parseInt(row.metricValues[0].value);
+      processedData.newUsers = parseInt(row.metricValues[1].value);
+      processedData.returningUsers = processedData.totalUsers - processedData.newUsers;
+      processedData.avgSessionDuration = parseFloat(row.metricValues[2].value);
+      processedData.funnel.visitors = processedData.totalUsers;
     }
 
-    // Process data for frontend
-    const processedData = {
-      newUsers: response.rows.reduce((sum, row) => sum + parseInt(row.metricValues[1].value), 0),
-      returningUsers: response.rows.reduce(
-        (sum, row) => sum + parseInt(row.metricValues[0].value) - parseInt(row.metricValues[1].value),
-        0
-      ),
-      geo: response.rows.reduce((acc, row) => {
+    // Main report for dimensions
+    const [mainResponse] = await analyticsDataClient.runReport({
+      property: `properties/${process.env.GA4_PROPERTY_ID}`,
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [
+        { name: "country" },
+        { name: "deviceCategory" },
+        { name: "pagePath" },
+      ],
+      metrics: [{ name: "activeUsers" }],
+    });
+
+    if (mainResponse.rows) {
+      processedData.geo = mainResponse.rows.reduce((acc, row) => {
         const country = row.dimensionValues[0].value;
         acc[country] = (acc[country] || 0) + parseInt(row.metricValues[0].value);
         return acc;
-      }, {}),
-      devices: response.rows.reduce((acc, row) => {
+      }, {});
+
+      processedData.devices = mainResponse.rows.reduce((acc, row) => {
         const device = row.dimensionValues[1].value;
         acc[device] = (acc[device] || 0) + parseInt(row.metricValues[0].value);
         return acc;
-      }, {}),
-      cities: response.rows.reduce((acc, row) => {
-        const city = row.dimensionValues[2].value;
-        acc[city] = (acc[city] || 0) + parseInt(row.metricValues[0].value);
-        return acc;
-      }, {}),
-      exitPages: response.rows.reduce((acc, row) => {
-        const page = row.dimensionValues[3].value;
+      }, {});
+
+      processedData.exitPages = mainResponse.rows.reduce((acc, row) => {
+        const page = row.dimensionValues[2].value;
         acc[page] = (acc[page] || 0) + parseInt(row.metricValues[0].value);
         return acc;
-      }, {}),
-      avgSessionDuration: response.rows.reduce(
-        (sum, row) => sum + parseFloat(row.metricValues[2].value),
-        0
-      ) / response.rows.length,
-    };
+      }, {});
+    }
+
+    // Event report for funnel
+    const [eventResponse] = await analyticsDataClient.runReport({
+      property: `properties/${process.env.GA4_PROPERTY_ID}`,
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "eventName" }],
+      metrics: [{ name: "eventCount" }],
+    });
+
+    if (eventResponse.rows) {
+      for (const row of eventResponse.rows) {
+        const eventName = row.dimensionValues[0].value;
+        const count = parseInt(row.metricValues[0].value);
+        if (eventName === "generate_lead") {
+          processedData.funnel.leads = count;
+        } else if (eventName === "purchase") {
+          processedData.funnel.clients = count;
+        }
+      }
+    }
+
+    // Sources report
+    const [sourcesResponse] = await analyticsDataClient.runReport({
+      property: `properties/${process.env.GA4_PROPERTY_ID}`,
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "sessionSource" }],
+      metrics: [{ name: "sessions" }],
+    });
+
+    if (sourcesResponse.rows) {
+      processedData.sources = sourcesResponse.rows.reduce((acc, row) => {
+        const source = row.dimensionValues[0].value;
+        acc[source] = parseInt(row.metricValues[0].value);
+        return acc;
+      }, {});
+    }
 
     return processedData;
   } catch (error) {
@@ -93,9 +128,10 @@ async function getAnalyticsData() {
       returningUsers: 0,
       geo: {},
       devices: {},
-      cities: {},
       exitPages: {},
       avgSessionDuration: 0,
+      funnel: { visitors: 0, leads: 0, clients: 0 },
+      sources: {},
     };
   }
 }
@@ -103,7 +139,9 @@ async function getAnalyticsData() {
 // API route
 router.get("/", async (req, res) => {
   try {
-    const data = await getAnalyticsData();
+    const startDate = req.query.startDate || "7daysAgo";
+    const endDate = req.query.endDate || "today";
+    const data = await getAnalyticsData(startDate, endDate);
     res.json({ success: true, data });
   } catch (error) {
     console.error("Error in analytics route:", error.message, error.stack);
