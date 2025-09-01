@@ -270,7 +270,7 @@ async function run() {
     app.use('/contact-us', contactUsRoute.router);
     app.use('/contact-us-submitted', contactUsSubmittedRoute.router);
     app.use('/support', supportRoute.router);
-    app.use("/testimonials", technogoliesRoute.router)
+    app.use("/testimonials", testimonialsRoute.router)
 
     console.log('All routes mounted successfully with Socket.IO support');
   } catch (err) {
