@@ -63,27 +63,47 @@ router.post("/", async (req, res) => {
 
 // PUT update a blog by ID
 router.put("/:id", async (req, res) => {
-    try {
-        const blogId = req.params.id;
-        const blogData = {
-            ...req.body,
-            updatedAt: new Date().toISOString()
-        };
-        const result = await blogsCollection.findOneAndUpdate(
-            { _id: new ObjectId(blogId) },
-            { $set: blogData },
-            { returnDocument: 'after' }
-        );
-        if (!result.value) {
-            return res.status(404).json({ error: "Blog not found" });
-        }
-        res.status(200).json({
-            success: true,
-            data: result.value
-        });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to update blog" });
+  try {
+    const blogId = req.params.id;
+    
+    // Validate if ID is a valid ObjectId
+    if (!ObjectId.isValid(blogId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Invalid blog ID format" 
+      });
     }
+
+    const blogData = {
+      ...req.body,
+      updatedAt: new Date().toISOString()
+    };
+
+    const result = await blogsCollection.findOneAndUpdate(
+      { _id: new ObjectId(blogId) },
+      { $set: blogData },
+      { returnDocument: 'after' }
+    );
+
+    if (!result.value) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Blog not found" 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result.value
+    });
+
+  } catch (error) {
+    console.error("Update blog error:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to update blog" 
+    });
+  }
 });
 
 // DELETE a blog by ID
