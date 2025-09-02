@@ -22,6 +22,26 @@ router.get("/", async (req, res) => {
     }
 });
 
+// GET a single blog by ID
+router.get("/:id", async (req, res) => {
+    try {
+        const blogId = req.params.id;
+        const blog = await blogsCollection.findOne({ _id: new ObjectId(blogId) });
+
+        if (!blog) {
+            return res.status(404).json({ error: "Blog not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: blog
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch blog" });
+    }
+});
+
+
 // POST a new blog
 router.post("/", async (req, res) => {
     try {
