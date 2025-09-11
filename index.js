@@ -61,6 +61,8 @@ const contactUsSubmittedRoute = require("./api/contact-us-submitted");
 const supportRoute = require("./api/support");
 const testimonialsRoute = require("./api/testimonials")
 const blogsRoute = require("./api/blogs")
+const portfolioRoute = require("./api/portfolio");
+const productsRoute =require("./api/products")
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -259,6 +261,8 @@ async function run() {
     supportRoute.setCollection(database);
     testimonialsRoute.setCollection(database);
     blogsRoute.setCollection(database);
+    portfolioRoute.setCollection(database);
+    productsRoute.setCollection(database)
 
     // Use routes
     app.use('/users', userRoute.router);
@@ -274,6 +278,8 @@ async function run() {
     app.use('/support', supportRoute.router);
     app.use("/testimonials", testimonialsRoute.router);
     app.use("/blogs", blogsRoute.router);
+    app.use("/portfolio", portfolioRoute.router);
+    app.use("/products", productsRoute.router)
 
     console.log('All routes mounted successfully with Socket.IO support');
   } catch (err) {
