@@ -26,40 +26,35 @@ router.get("/", async(req, res) => {
     }
 })
 
-// get single products
+// get single product
 router.get("/:id", async(req, res) => {
-    const {id} = req.params;
-    if(!ObjectId.isValid(id)){
-        return res.status(400).json({
-            success: false,
-            message: "Invalid ID format",
-        })
+  const { id } = req.params;
+
+  try {
+    // ObjectId banano try korbe, na hoile string hishebe
+    const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
+    const productsItem = await productsCollection.findOne(query);
+
+    if(!productsItem){
+      return res.status(404).json({
+        success: false,
+        message: "Products item not found",
+      });
     }
 
-    try {
-        const productsItem = await productsCollection.findOne({
-            _id: new ObjectId(id),
-        });
+    res.status(200).json({
+      success: true,
+      data: productsItem,
+    });
+  } catch (error) {
+    console.error("Error fetching product item:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    })
+  }
+});
 
-        if(!productsItem){
-            return res.status(404).json({
-                success: false,
-                message: "Products item not found",
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: productsItem,
-        })
-    } catch (error) {
-        console.error("Error fetching products item:", error);
-        res.status(500).json({
-            success: false,
-            message: "Internal Server error",
-        })
-    }
-})
 
 
 // post a new product item
@@ -88,12 +83,12 @@ router.put("/:id", async(req, res) => {
     const {id} = req.params;
     const updatedProducts = req.body;
 
-    if(!ObjectId.isValid(id)) {
-        return res.status(400).json({
-            success: false,
-            message: "Invalid ID format",
-        })
-    }
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid ID format",
+    });
+  }
 
     try {
         const result = await productsCollection.updateOne(
