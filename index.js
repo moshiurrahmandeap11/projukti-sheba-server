@@ -64,6 +64,7 @@ const blogsRoute = require("./api/blogs")
 const portfolioRoute = require("./api/portfolio");
 const productsRoute =require("./api/products")
 const ourClientsRoute = require("./api/ourClients")
+const ourSolutionsRoute = require('./api/our-solutions');
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -265,6 +266,7 @@ async function run() {
     portfolioRoute.setCollection(database);
     productsRoute.setCollection(database);
     ourClientsRoute.setCollection(database);
+    ourSolutionsRoute.setCollection(database);
 
     // Use routes
     app.use('/users', userRoute.router);
@@ -283,6 +285,7 @@ async function run() {
     app.use("/portfolio", portfolioRoute.router);
     app.use("/products", productsRoute.router);
     app.use("/ourclients", ourClientsRoute.router);
+    app.use('/our-solutions', ourSolutionsRoute.router);
 
     console.log('All routes mounted successfully with Socket.IO support');
   } catch (err) {
