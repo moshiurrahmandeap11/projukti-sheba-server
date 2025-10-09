@@ -5,13 +5,16 @@ const { ObjectId } = require('mongodb');
 let ourSolutionsCollection;
 
 const setCollection = (db) => {
-    ourSolutionsCollection = db.collection("OurSolutions");
+    ourSolutionsCollection = db.collection("ourSolutions"); // lowercase এ পরিবর্তন করুন
 }
 
 // Get all solutions
 router.get('/', async (req, res) => {
     try {
+        console.log('Fetching all solutions...'); // Debug log
         const solutions = await ourSolutionsCollection.find({}).toArray();
+        console.log('Found solutions:', solutions.length); // Debug log
+        
         res.json({
             success: true,
             data: solutions
@@ -25,10 +28,29 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Debug route - সব রাউট চেক করার জন্য
+router.get('/debug/routes', (req, res) => {
+    const routes = [];
+    router.stack.forEach((middleware) => {
+        if (middleware.route) {
+            routes.push({
+                path: middleware.route.path,
+                methods: Object.keys(middleware.route.methods)
+            });
+        }
+    });
+    res.json({ 
+        message: 'Our Solutions Routes',
+        routes: routes 
+    });
+});
+
 // Get solution by category
 router.get('/category/:category', async (req, res) => {
     try {
         const { category } = req.params;
+        console.log('Fetching solution for category:', category);
+        
         const solution = await ourSolutionsCollection.findOne({ category });
         
         if (!solution) {
