@@ -25,10 +25,19 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get testimonials by type
+// Get testimonials by type - এই রাউটটি নিশ্চিত করুন
 router.get('/type/:type', async (req, res) => {
     try {
         const { type } = req.params;
+        
+        // Validate type
+        if (!['video', 'text'].includes(type)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid type. Must be "video" or "text"'
+            });
+        }
+
         const testimonials = await testimonialsCollection.find({ type }).sort({ createdAt: -1 }).toArray();
         
         res.json({
@@ -59,7 +68,7 @@ router.post('/', async (req, res) => {
             photoURL,
             testimonial,
             videoUrl,
-            type // 'video' or 'text'
+            type
         } = req.body;
 
         // Validation
@@ -67,6 +76,13 @@ router.post('/', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Name, testimonial, and type are required'
+            });
+        }
+
+        if (!['video', 'text'].includes(type)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Type must be either "video" or "text"'
             });
         }
 
@@ -115,7 +131,6 @@ router.put('/:id', async (req, res) => {
                 message: 'Invalid testimonial ID'
             });
         }
-
 
         const allowedFields = [
             'name', 'position', 'company', 'location', 'date', 'rating',
