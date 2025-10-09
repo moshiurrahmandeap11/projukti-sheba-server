@@ -8,30 +8,10 @@ const setCollection = (db) => {
     testimonialsCollection = db.collection("testimonials");
 }
 
-// Debug route
-router.get('/debug/routes', (req, res) => {
-    const routes = [];
-    router.stack.forEach((middleware) => {
-        if (middleware.route) {
-            routes.push({
-                path: middleware.route.path,
-                methods: Object.keys(middleware.route.methods)
-            });
-        }
-    });
-    res.json({ 
-        message: 'Testimonials Routes',
-        routes: routes 
-    });
-});
-
 // Get all testimonials
 router.get('/', async (req, res) => {
     try {
-        console.log('Fetching all testimonials...');
         const testimonials = await testimonialsCollection.find({}).sort({ createdAt: -1 }).toArray();
-        console.log('Found testimonials:', testimonials.length);
-        
         res.json({
             success: true,
             data: testimonials
@@ -45,11 +25,10 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get testimonials by type
+// Get testimonials by type - এই রাউটটি নিশ্চিত করুন
 router.get('/type/:type', async (req, res) => {
     try {
         const { type } = req.params;
-        console.log('Fetching testimonials by type:', type);
         
         // Validate type
         if (!['video', 'text'].includes(type)) {
@@ -60,7 +39,6 @@ router.get('/type/:type', async (req, res) => {
         }
 
         const testimonials = await testimonialsCollection.find({ type }).sort({ createdAt: -1 }).toArray();
-        console.log('Found testimonials for type', type, ':', testimonials.length);
         
         res.json({
             success: true,
