@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, Db } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -65,6 +65,8 @@ const portfolioRoute = require("./api/portfolio");
 const productsRoute =require("./api/products")
 const ourClientsRoute = require("./api/ourClients")
 const ourSolutionsRoute = require('./api/our-solutions');
+const overviewRoute = require("./api/overview")
+const pricingRoute = require("./api/pricing")
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -267,6 +269,8 @@ async function run() {
     productsRoute.setCollection(database);
     ourClientsRoute.setCollection(database);
     ourSolutionsRoute.setCollection(database);
+    overviewRoute.setCollection(database)
+    pricingRoute.setCollection(database)
 
     // Use routes
     app.use('/users', userRoute.router);
@@ -286,6 +290,8 @@ async function run() {
     app.use("/products", productsRoute.router);
     app.use("/ourclients", ourClientsRoute.router);
     app.use('/our-solutions', ourSolutionsRoute.router);
+    app.use("/overview", overviewRoute.router);
+    app.use("/pricing", pricingRoute.router);
 
     console.log('All routes mounted successfully with Socket.IO support');
   } catch (err) {
